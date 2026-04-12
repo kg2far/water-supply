@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin Dashboard</title>
+
+  <style>
+    
+  </style>
+</head>
+
+<body>
+
+<h1>👨‍💼 Admin Dashboard</h1>
+<button onclick="logout()">Logout</button>
+
+<div id="orders"></div>
+
+<script>
+const token = localStorage.getItem("token");
+
+if (!token) {
+  alert("Login first");
+  window.location.href = "login.html";
+}
+
+// decode token
+const payload = JSON.parse(atob(token.split('.')[1]));
+
+// block non-admin
+if (payload.role !== "admin") {
+  alert("Access denied!");
+  window.location.href = "index.html";
+}
+
+// ================= LOAD ORDERS =================
+function loadOrders() {
+
+  fetch("http://localhost:3000/orders", {
+    headers: {
+      "Authorization": "Bearer " + token
+    }
+  })
+  .then(res => res.json())
+  .then(data => {
+
+    console.log("ADMIN DATA:", data);
+
+    const container = document.getElementById("orders");
+    container.innerHTML = "";
+
+    if (!data.length) {
+      container.innerHTML = "<p>No orders found</p>";
+      return;
+    }
+
+    data.forEach(o => {
+
+      const div = document.createElement("div");
+      div.className = "card";
+
+      div.innerHTML = `
+        <strong>${o.name} ${o.surname}</strong><br>
+        📞 ${o.phone}<br>
+        💧 ${o.liters}L<br>
+        📍 ${o.location}<br>
+        STATUS: ${o.status || "pending"}<br><br>
+
+        <button class="done" onclick="updateStatus('${o._id}', 'done')">✅ Done</button>
+        <button class="pending" onclick="updateStatus('${o._id}', 'pending')">⏳ Pending</button>
+        <button class="delete" onclick="deleteOrder('${o._id}')">🗑 Delete</button>
+      `;
+
+      container.appendChild(div);
+    });
+  })
+  .catch(err => {
+    console.error(err);
+    alert("Failed to load orders");
+  });
+}
+
+// ================= UPDATE STATUS =================
+function updateStatus(id, status) {
+  fetch(`http://localhost:3000/orders/${id}/status`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + token
+    },
+    body: JSON.stringify({ status })
+  })
+  .then(() => loadOrders());
+}
+
+// ================= DELETE =================
+function deleteOrder(id) {
+  fetch(`http://localhost:3000/orders/${id}`, {
+    method: "DELETE",
+    headers: {
+      "Authorization": "Bearer " + token
+    }
+  })
+  .then(() => loadOrders());
+}
+
+// ================= LOGOUT =================
+function logout() {
+  localStorage.removeItem("token");
+  window.location.href = "login.html";
+}
+
+// LOAD ON START
+loadOrders();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>💧 Water Delivery Pro</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Poppins&display=swap" rel="stylesheet">
+  <link href="style.css" rel="stylesheet">
+
+  <style>
+   
+  </style>
+</head>
+
+<body>
+
+<header>💧 Water Delivery Pro</header>
+
+<div class="container">
+
+  <div class="card">
+    <span id="userEmail"></span>
+    <button class="btn btn-danger" onclick="logout()">Logout</button>
+  </div>
+
+  <div class="card">
+    <h3>Place Order</h3>
+
+    <input id="name" placeholder="Name">
+    <input id="surname" placeholder="Surname">
+    <input id="phone" placeholder="Phone">
+    <input id="liters" placeholder="Liters">
+    <input id="location" placeholder="Lat,Lng">
+
+    <button class="btn btn-warning" onclick="getLocation()">📍 Use Location</button>
+    <button class="btn btn-primary" onclick="orderWater()">🚀 Order</button>
+
+    <div id="map"></div>
+  </div>
+
+  <div class="card">
+    <h3>Orders</h3>
+    <div id="orders"></div>
+  </div>
+
+</div>
+
+<script>
+const token = localStorage.getItem("token");
+if (!token) window.location.href = "login.html";
+
+function getEmail() {
+  return JSON.parse(atob(token.split(".")[1])).email;
+}
+document.getElementById("userEmail").innerText = "👤 " + getEmail();
+
+let map, directionsService, directionsRenderer, markers = [];
+
+// ✅ MAP INIT
+window.initMap = function () {
+  const center = { lat: -23.9, lng: 30.1 };
+
+  map = new google.maps.Map(document.getElementById("map"), {
+    zoom: 10,
+    center
+  });
+
+  directionsService = new google.maps.DirectionsService();
+  directionsRenderer = new google.maps.DirectionsRenderer();
+  directionsRenderer.setMap(map);
+
+  loadOrders();
+};
+
+// ✅ ORDER
+function orderWater() {
+
+  const order = {
+    name: name.value,
+    surname: surname.value,
+    phone: phone.value,
+    liters: liters.value,
+    location: location.value
+  };
+
+  fetch("http://localhost:3000/orders", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + token
+    },
+    body: JSON.stringify(order)
+  })
+  .then(r => r.json())
+  .then(() => {
+
+    alert("✅ Order placed!");
+
+    sendWhatsApp(order); // ✅ FIXED
+
+    loadOrders();
+  });
+}
+
+// ✅ LOAD ORDERS
+function loadOrders() {
+
+  fetch("http://localhost:3000/orders", {
+    headers: { "Authorization": "Bearer " + token }
+  })
+  .then(r => r.json())
+  .then(data => {
+
+    const box = document.getElementById("orders");
+    box.innerHTML = "";
+
+    markers.forEach(m => m.setMap(null));
+    markers = [];
+
+    data.forEach(o => {
+
+      const div = document.createElement("div");
+      div.className = "order";
+
+      div.innerHTML = `
+        <strong>${o.name} ${o.surname}</strong><br>
+        📞 ${o.phone}<br>
+        💧 ${o.liters}L<br>
+        📍 ${o.location}<br><br>
+
+        <button class="btn btn-warning" onclick="editOrder('${o._id}')">Edit</button>
+        <button class="btn btn-danger" onclick="deleteOrder('${o._id}')">Delete</button>
+        <button class="btn btn-success" onclick="navigate('${o.location}')">Go</button>
+      `;
+
+      box.appendChild(div);
+
+      // marker
+      if (o.location) {
+        const [lat, lng] = o.location.split(",").map(Number);
+
+        if (!isNaN(lat) && !isNaN(lng)) {
+          const marker = new google.maps.Marker({
+            position: { lat, lng },
+            map
+          });
+          markers.push(marker);
+        }
+      }
+
+    });
+
+  });
+}
+
+// ✅ NAVIGATION
+function navigate(loc) {
+
+  const [lat, lng] = loc.split(",").map(Number);
+
+  navigator.geolocation.getCurrentPosition(pos => {
+
+    directionsService.route({
+      origin: {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude
+      },
+      destination: { lat, lng },
+      travelMode: "DRIVING"
+    }, (res, status) => {
+      if (status === "OK") directionsRenderer.setDirections(res);
+    });
+
+  });
+}
+
+// ✅ LOCATION
+function getLocation() {
+  navigator.geolocation.getCurrentPosition(pos => {
+    location.value = pos.coords.latitude + "," + pos.coords.longitude;
+  });
+}
+
+// ✅ DELETE
+function deleteOrder(id) {
+  fetch(`http://localhost:3000/orders/${id}`, {
+    method: "DELETE",
+    headers: { "Authorization": "Bearer " + token }
+  }).then(loadOrders);
+}
+
+// ✅ EDIT
+function editOrder(id) {
+  const name = prompt("Name:");
+  const surname = prompt("Surname:");
+  const phone = prompt("Phone:");
+  const liters = prompt("Liters:");
+  const location = prompt("Location:");
+
+  fetch(`http://localhost:3000/orders/${id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + token
+    },
+    body: JSON.stringify({ name, surname, phone, liters, location })
+  }).then(loadOrders);
+}
+
+// ✅ WHATSAPP
+function sendWhatsApp(order) {
+  const msg = `💧 Order Confirmed
+${order.name} ${order.surname}
+${order.liters}L
+📍 ${order.location}`;
+
+  window.open(`https://wa.me/${order.phone}?text=${encodeURIComponent(msg)}`);
+}
+
+// ✅ LOGOUT
+function logout() {
+  localStorage.removeItem("token");
+  window.location.href = "login.html";
+}
+</script>
+
+<script async defer
+src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDuRMHuCNdAjcL5w77XNOPKQiOP-F0tjIk&callback=initMap">
+</script>
+
+</body>
+</html>

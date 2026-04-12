@@ -1,0 +1,45 @@
+<html>
+    <title>
+
+    </title>
+    <head>
+
+    </head>
+
+    <body>
+
+
+
+<h2>Orders</h2>
+<ul id="orders"></ul>
+
+<script>
+function loadOrders() {
+  fetch("http://localhost:3000/orders", {
+    headers: {
+      "Authorization": "Bearer " + localStorage.getItem("token")
+    }
+  })
+  .then(res => res.json())
+  .then(data => {
+    const ul = document.getElementById("orders");
+    ul.innerHTML = "";
+
+    data.forEach(o => {
+      const li = document.createElement("li");
+
+      li.innerHTML = `
+        ${o.email} - ${o.liters}L - ${o.location} - ${o.status}
+      `;
+
+      ul.appendChild(li);
+    });
+  });
+}
+
+loadOrders();
+
+</script>
+
+ </body>
+</html>
